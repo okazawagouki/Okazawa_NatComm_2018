@@ -11,9 +11,9 @@ Okazawa G, Sha L, Purcell BA, Kiani R (2018). [Psychophysical reverse correlatio
 
 ## Script
 
-[Simulation1_fixed_and_RT_task.m](./Simulation1_fixed_and_RT_task.m): Show psychophysical kernel under fixed duration and reaction time and the effect of non-decision time (corresponds to Fig. 3 in the paper).
+[Simulation1_fixed_and_RT_task.m](./Simulation1_fixed_and_RT_task.m): Shows psychophysical kernel under fixed duration and reaction time and the effect of non-decision time (corresponds to Fig. 3 in the paper).
 
-[Simulation2_urgency_and_race_model.m](./Simulation2_urgency_and_race_model.m): Show psychophysical kernel under drift diffusion model with urgency and competing accumulator model with input correlation, reflective bound, and leak/mutual inhibition.
+[Simulation2_urgency_and_race_model.m](./Simulation2_urgency_and_race_model.m): Shows psychophysical kernel under drift diffusion model with urgency and competing accumulator model with input correlation, reflective bound, and leak/mutual inhibition (corresponds to Fig. 6 in the paper).
 
 ## License
 
