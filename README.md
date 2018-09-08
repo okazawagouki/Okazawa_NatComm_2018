@@ -6,6 +6,14 @@ Okazawa G, Sha L, Purcell BA, Kiani R (2018). [Psychophysical reverse correlatio
 
 ## Simulation code
 
+[DDM_Kernel_Simulation.m](./DDM_Kernel_Simulation.m): Run simulation of psychophysical kernel under the assumption of drift diffusion model.
+[RACE_Kernel_Simulation.m](./RACE_Kernel_Simulation.m): Run simulation of psychophysical kernel under the assumption of competing accumulator model.
+
+## Script
+
+[Simulation1_fixed_and_RT_task.m](./Simulation1_fixed_and_RT_task.m): Show psychophysical kernel under fixed duration and reaction time and the effect of non-decision time (corresponds to Fig. 3 in the paper).
+
+[Simulation2_urgency_and_race_model.m](./Simulation2_urgency_and_race_model.m): Show psychophysical kernel under drift diffusion model with urgency and competing accumulator model with input correlation, reflective bound, and leak/mutual inhibition.
 
 ## License
 
