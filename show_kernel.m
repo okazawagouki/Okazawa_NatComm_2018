@@ -7,7 +7,9 @@ weight_len = xrange(2);
 smoothen = @(x, val) conv(x, fspecial('average',[1 val]),'same')./conv(ones(size(x)), fspecial('average',[1 val]),'same');
 
 
-scaling_factor = 1 / sim.param.B(2) * 2;
+bound_height = mean(sim.param.bound_height(1:round(sim.medianRT), 2)) - sim.param.B0;
+
+scaling_factor = 1 / bound_height * 2;
 
 switch alignment_type
     case 'stim'

@@ -7,7 +7,7 @@
 %
 % The original simulation is computationally intensive (10^6 trials). As a
 % short cut, this script runs a smaller number of trials (10^4) but applys
-% a boxcar smoothing (@ms) to reduce the noise in kernel. For the actual
+% a boxcar smoothing (50 ms) to reduce the noise in kernel. For the actual
 % production of the result, no smoothing should be applied.
 % 
 %
@@ -35,6 +35,7 @@ fprintf('Running fixed duration task simulation...\n');
 fix_sim = DDM_Kernel_Simulation(p);
 
 % RT task without non-decision time
+clear p;
 p.termination_rule = {'RT', NaN};
 p.t_max = 5000;
 p.B = [-30 30]; % Bound
@@ -45,6 +46,7 @@ fprintf('Running RT task without non-decision time simulation...\n');
 RT_sim = DDM_Kernel_Simulation(p);
 
 % RT task with non-decision time
+clear p;
 p.termination_rule = {'RT', NaN};
 p.t_max = 5000;
 p.B = [-30 30]; % Bound

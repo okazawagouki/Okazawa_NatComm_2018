@@ -1,21 +1,41 @@
 function sim = RACE_Kernel_Simulation(p)
-% p is a struct to define parameter. See below for the default parameters.
+% function sim = RACE_Kernel_Simulation(p)
+%   Main code to run simulation of psychophysical reverse correlation under
+%   the assumption of race model.
+%
+%   Input:
+%       p -> struct to define model parameters.
+%            see the code below for the available parameters and their
+%            default values.
+%   Output:
+%       sim -> struct that contains simulation output.
+%       sim.path.stim{i}: average path of decision variable aligned to stimulus onset
+%                         when the model choice is i (1 or 2)
+%       sim.path.resp{i}: (RT task only) average path of decision variable aligned to response
+%                         when the model choice is i (1 or 2).
+%       sim.kernel.stim{i}: kernel aligned to stimulus onset when the model choice is i (1 or 2)
+%       sim.kernel.resp{i}: (RT task only) kernel aligned to response when the model choice is i (1 or 2).
+%       sim.bound_crossed_percent: percent the model crossed the bound
+%                       within the simulated time (should be close to 100% to obtain an accurate result).
+%       sim.cut_off_RT: the duration of kernel (default: cut off at median reaction time).
+%       sim.param : parameters used to run the simulation (input p).
+%
+%
+% Copyright (2018), Kiani Lab, NYU
 
 %% default parameters
 def.iters = 10000;   % number of simulated trials
-def.t_max = 5000;    % number of simulated time steps in each trial
-def.split_trials = 0; % split trials when the memory consumption is large (if larger than 0, this corresponds to number of trials to split).
-def.parfor = false;
+def.t_max = 5000;    % number of simulated time steps in each trial (ms)
 
 def.dt = 1;         % time unit, in ms
 def.t_frame = 1;   % duration of one noise frame
 
 def.termination_rule = {'RT', NaN}; % rule RT task:{'RT',NaN}, fixed:{'Fixed', stim_duration}
 
-def.coh = 0;    % coherence (if not scalar, coh is randomly chosen for eath trial)
+def.coh = 0;    % coherence (if not scalar, coh is randomly chosen from vectors for eath trial)
 def.k = 1;      % sensitivity parameter (drift rate = coh * k)
 def.k0 = 0;         % base drift of the accumulators, equivalent of **bias**
-def.B = [-30 30];   % decision bound (1 x 2) or (t_max x 2)
+def.B = [-30 30];   % lower and upper bounds (1 x 2) or (t_max x 2)
 def.rB = [Inf -Inf]; % reflection bound (1 x 2) or (t_max x 2)
 def.B0 = 0;         % base line of the accumulators (correspond to bias)
 
@@ -48,7 +68,8 @@ def.s_past_bound =  NaN; %can be 'none' or NaN. choosing them depends on whether
 def.cut_off_decision = false;   % if true, make a decision when the process reaches to t_max even when it does not reach the bounds.
 def.get_raw_data = false;   %whether to get raw S, DV, and other computed values.
 def.seed = NaN;
-def.cut_off_RT = nan; % explicitly determine cut off RT
+
+def.cut_off_RT = nan; % explicitly determine cut off RT (otherwise, median RT will be the cut off time)
 def.error_no_reach = true; % end the program with error when less than 95% of trials reach the bound.
 
 %% setup
@@ -57,12 +78,7 @@ if nargin < 1
 else
     p = safeStructAssign(def, p);
 end
-    % split trials to reduce memory consumption
-if p.split_trials
-    disp('split_trials is on. Trials will be split.');
-    sim = RACE_Kernel_Simulation_split_trial(p);
-    return;
-end
+
 sttime = tic;
 
     %fixed bound height over time. change it to simulate collapsing bounds
@@ -87,8 +103,7 @@ end
 sim = struct();
 
 if ~isnan(p.seed)
-    %fix the random seed to reduce variability in the model exploration pahse. 
-    %For final simulations, you should use random seed
+    %fix the random seed if you want to always obtain the identical result
     RandStream.setGlobalStream(RandStream('mt19937ar','Seed',p.seed));
 end
 
@@ -114,7 +129,6 @@ S = reshape(S', [ceil(p.t_max/p.t_frame)*p.t_frame, p.iters])';
 S = S * p.k + p.k0;
 Sb = (Sb - k)';
 
-fprintf('Sensory matrix generated (%1.1fsec)\n', toc(sttime));
     %non-linear compression of signal
 if isa(p.signal_compress, 'function_handle')
     S = p.signal_compress(S);
@@ -122,7 +136,9 @@ end
 
     %apply temporal weights
 if p.stim_noise == 0
-    warning('Stim noise is 0. The two race processes will be complitely anti-correlated.');
+    if p.rho ~= -1
+        warning('Stim noise is 0. Input correlation becomes automatically -1.');
+    end
     noise_rho = -1;
 else
     noise_rho = (p.rho * (1 + p.stim_noise^2) + 1)/(p.stim_noise^2); % see Race_model_correlation_math.docx
@@ -152,8 +168,6 @@ for t=2:size(V1,2)
     V1c(V1c(:,t) < rB(1), t) = rB(1);
     V2c(V2c(:,t) < rB(2), t) = rB(2);
 end
-
-fprintf('Decision variable generated (%1.1fsec)\n', toc(sttime));
 
 clear V1 V2;
     %find the choice and bound crossing time for each trial 
@@ -232,8 +246,6 @@ end
 
 est_dec_time(I) = RT(I) - p.subtract_time;
 
-fprintf('RT computed (%1.1fsec)\n', toc(sttime));
-
 
     %determine what happens to decision variable and evidence traces after bound crossing 
 for trial = find(bound_crossing)'
@@ -273,11 +285,11 @@ else
 end
 
 
-sim.path.motion{1} = nanmean(V1c(choice==1,1:bt_median),1);
-sim.path.motion{2} = nanmean(V2c(choice==2,1:bt_median),1);
+sim.path.stim{1} = nanmean(V1c(choice==1,1:bt_median),1);
+sim.path.stim{2} = nanmean(V2c(choice==2,1:bt_median),1);
     %psychophysical kernel aligned to stimulus onset
-sim.kernel.motion{1} = nanmean(Sb(choice==1,1:bt_mediant),1);
-sim.kernel.motion{2} = nanmean(Sb(choice==2,1:bt_mediant),1);
+sim.kernel.stim{1} = nanmean(Sb(choice==1,1:bt_mediant),1);
+sim.kernel.stim{2} = nanmean(Sb(choice==2,1:bt_mediant),1);
     %average decision variable and psychophysical kernel aligned to choice 
 V1_choice = nan(p.iters,bt_median);
 V2_choice = nan(p.iters,bt_median);
@@ -295,10 +307,10 @@ for trial = 1 : p.iters
     end
 end
 sim.bound_crossed_percent = sum(bound_crossing)/length(bound_crossing) * 100;
-sim.path.choice{1} = nanmean(V1_choice(choice==1,:),1);
-sim.path.choice{2} = nanmean(V2_choice(choice==2,:),1);
-sim.kernel.choice{1} = nanmean(S_choice(choice==1,:),1);
-sim.kernel.choice{2} = nanmean(S_choice(choice==2,:),1);
+sim.path.resp{1} = nanmean(V1_choice(choice==1,:),1);
+sim.path.resp{2} = nanmean(V2_choice(choice==2,:),1);
+sim.kernel.resp{1} = nanmean(S_choice(choice==1,:),1);
+sim.kernel.resp{2} = nanmean(S_choice(choice==2,:),1);
 sim.t_frame = p.t_frame;
 sim.cut_off_RT = bt_mediant;
 sim.param = p;
@@ -316,73 +328,11 @@ if p.get_raw_data
     sim.coh = coh(1,:)'; % coherence level
 end
 
-fprintf('percent cross bound: %1.1f%%, median RT = %1.3f (time spent %1.1fsec)\n', sim.bound_crossed_percent, nanmedian(RT), toc(sttime));
+fprintf('\tpercent cross bound: %1.1f%%, median RT = %1.3f (time spent %1.1fsec)\n', sim.bound_crossed_percent, nanmedian(RT), toc(sttime));
 if sim.bound_crossed_percent < 95
     if p.error_no_reach
         error('Bound crossed percent is less than 95%. You should use longer t_max');
-    else
-        warning('Bound crossed percent is less than 95%. You should use longer t_max');
     end
 end
-
-
-function sim = RACE_Kernel_Simulation_split_trial(p)
-iters = p.iters;
-max_tr = p.split_trials;
-if mod(iters, max_tr)~=0
-    error('iters cannot be split into split_trials');
-end
-N = iters/max_tr;
-
-seed = p.seed;
-if ~isnan(seed)
-    RandStream.setGlobalStream(RandStream('mt19937ar','Seed',seed));
-end
-p.seed = NaN;
-
-% compute N simulations
-orig_iters = iters;
-orig_split = p.split_trials;
-
-p.split_trials = 0;
-p.iters = max_tr;
-sim_all = cell(N,1);
-sim_all{1} = RACE_Kernel_Simulation(p);
-p.cut_off_RT = sim_all{1}.cut_off_RT; % match RT across simulations
-if p.parfor
-    parfor n=2:N
-        sim_all{n} = RACE_Kernel_Simulation(p);
-    end
-else
-    for n=2:N
-        sim_all{n} = RACE_Kernel_Simulation(p);
-    end
-end
-
-% average N simulations
-sim = sim_all{1};
-for n=2:N
-    sim.path.motion{1} = sim.path.motion{1} + sim_all{n}.path.motion{1};
-    sim.path.motion{2} = sim.path.motion{2} + sim_all{n}.path.motion{2};
-    sim.path.choice{1} = sim.path.choice{1} + sim_all{n}.path.choice{1};
-    sim.path.choice{2} = sim.path.choice{2} + sim_all{n}.path.choice{2};
-    sim.kernel.motion{1} = sim.kernel.motion{1} + sim_all{n}.kernel.motion{1};
-    sim.kernel.motion{2} = sim.kernel.motion{2} + sim_all{n}.kernel.motion{2};
-    sim.kernel.choice{1} = sim.kernel.choice{1} + sim_all{n}.kernel.choice{1};
-    sim.kernel.choice{2} = sim.kernel.choice{2} + sim_all{n}.kernel.choice{2};
-end
-sim.path.motion{1} = sim.path.motion{1}/N;
-sim.path.motion{2} = sim.path.motion{2}/N;
-sim.path.choice{1} = sim.path.choice{1}/N;
-sim.path.choice{2} = sim.path.choice{2}/N;
-sim.kernel.motion{1} = sim.kernel.motion{1}/N;
-sim.kernel.motion{2} = sim.kernel.motion{2}/N;
-sim.kernel.choice{1} = sim.kernel.choice{1}/N;
-sim.kernel.choice{2} = sim.kernel.choice{2}/N;
-
-sim.param.iters = orig_iters;
-sim.param.split_trials = orig_split;
-
-
 
 
