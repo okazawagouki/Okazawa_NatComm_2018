@@ -1,11 +1,32 @@
 function sim = DDM_Kernel_Simulation(p)
-% p is a struct to define parameter. See below for the default parameters.
+% function sim = DDM_Kernel_Simulation(p)
+%   Main code to run simulation of psychophysical reverse correlation under
+%   the assumption of drift diffusion model.
+%
+%   Input:
+%       p -> struct to define model parameters.
+%            see the code below for the available parameters and their
+%            default values.
+%   Output:
+%       sim -> struct that contains simulation output.
+%       sim.path.stim{i}: average path of decision variable aligned to stimulus onset
+%                         when the model choice is i (1 or 2)
+%       sim.path.resp{i}: (RT task only) average path of decision variable aligned to response
+%                         when the model choice is i (1 or 2).
+%       sim.kernel.stim{i}: kernel aligned to stimulus onset when the model choice is i (1 or 2)
+%       sim.kernel.resp{i}: (RT task only) kernel aligned to response when the model choice is i (1 or 2).
+%       sim.bound_crossed_percent: percent the model crossed the bound
+%                       within the simulated time (should be close to 100% to obtain an accurate result).
+%       sim.cut_off_RT: the duration of kernel (default: cut off at median reaction time).
+%       sim.param : parameters used to run the simulation (input p).
+%
+%
+% Copyright (2018), Kiani Lab, NYU
+
 
 %% default parameters
 def.iters = 10000;   % number of simulated trials
-def.t_max = 5000;    % number of simulated time steps in each trial
-def.split_trials = 0; % split trials when the memory consumption is large (if larger than 0, this corresponds to number of trials to split).
-def.parfor = false;
+def.t_max = 5000;    % number of simulated time steps in each trial (ms)
 
 def.dt = 1;         % time unit, in ms
 def.t_frame = 1;   % duration of one noise frame
@@ -57,12 +78,7 @@ if nargin < 1
 else
     p = safeStructAssign(def, p);
 end
-    % split trial to reduce memory consumption
-if p.split_trials
-    disp('split_trials is on. Trials will be split.');
-    sim = DDM_Kernel_Simulation_split_trial(p);
-    return;
-end
+
 sttime = tic;
 
     %fixed bound height over time. change it to simulate collapsing bounds
@@ -89,8 +105,7 @@ end
 sim = struct();
 
 if ~isnan(p.seed)
-    %fix the random seed to reduce variability in the model exploration pahse. 
-    %For final simulations, you should use random seed
+    %fix the random seed if you want to always obtain the identical result
     RandStream.setGlobalStream(RandStream('mt19937ar','Seed',p.seed));
 end
 
@@ -264,11 +279,11 @@ else
 end
 
 
-sim.path.motion{1} = nanmean(V(choice==1,1:bt_median),1);
-sim.path.motion{2} = nanmean(V(choice==2,1:bt_median),1);
+sim.path.stim{1} = nanmean(V(choice==1,1:bt_median),1);
+sim.path.stim{2} = nanmean(V(choice==2,1:bt_median),1);
     %psychophysical kernel aligned to stimulus onset
-sim.kernel.motion{1} = nanmean(Sb(choice==1,1:bt_mediant),1);
-sim.kernel.motion{2} = nanmean(Sb(choice==2,1:bt_mediant),1);
+sim.kernel.stim{1} = nanmean(Sb(choice==1,1:bt_mediant),1);
+sim.kernel.stim{2} = nanmean(Sb(choice==2,1:bt_mediant),1);
 
 
 if strcmp(p.termination_rule{1}, 'RT') % if RT task
@@ -286,19 +301,18 @@ if strcmp(p.termination_rule{1}, 'RT') % if RT task
             S_choice(trial,end-length(valid_portion2)+1:end) = Sb(trial,valid_portion2);
         end
     end
-    sim.path.choice{1} = nanmean(V_choice(choice==1,:),1);
-    sim.path.choice{2} = nanmean(V_choice(choice==2,:),1);
-    sim.kernel.choice{1} = nanmean(S_choice(choice==1,:),1);
-    sim.kernel.choice{2} = nanmean(S_choice(choice==2,:),1);
+    sim.path.resp{1} = nanmean(V_choice(choice==1,:),1);
+    sim.path.resp{2} = nanmean(V_choice(choice==2,:),1);
+    sim.kernel.resp{1} = nanmean(S_choice(choice==1,:),1);
+    sim.kernel.resp{2} = nanmean(S_choice(choice==2,:),1);
 else
-    sim.path.choice{1} = [];
-    sim.path.choice{2} = [];
-    sim.kernel.choice{1} = [];
-    sim.kernel.choice{2} = [];
+    sim.path.resp{1} = [];
+    sim.path.resp{2} = [];
+    sim.kernel.resp{1} = [];
+    sim.kernel.resp{2} = [];
 end
 
 sim.bound_crossed_percent = sum(bound_crossing)/length(bound_crossing) * 100;
-sim.t_frame = p.t_frame;
 sim.cut_off_RT = bt_mediant;
 sim.param = p;
 
@@ -314,74 +328,12 @@ if p.get_raw_data
     sim.coh = coh(1,:)'; % coherence level
 end
 
-fprintf('percent cross bound: %1.1f%%, median RT = %1.3f (time spent %1.1fsec)\n', sim.bound_crossed_percent, nanmedian(RT), toc(sttime));
+fprintf('\tpercent cross bound: %1.1f%%, median RT = %1.3f (time spent %1.1fsec)\n', sim.bound_crossed_percent, nanmedian(RT), toc(sttime));
 if sim.bound_crossed_percent < 95
     if p.error_no_reach
-        error('Bound crossed percent is less than 95%. You should use longer t_max or set error_no_reach false');
-    else
-        disp('Bound crossed percent is less than 95%.');
+        error('Bound crossed percent is less than 95%. You should use longer t_max');
     end
 end
-
-
-function sim = DDM_Kernel_Simulation_split_trial(p)
-iters = p.iters;
-max_tr = p.split_trials;
-if mod(iters, max_tr)~=0
-    error('iters/split_trials must be integer');
-end
-N = iters/max_tr;
-
-seed = p.seed;
-if ~isnan(seed)
-    RandStream.setGlobalStream(RandStream('mt19937ar','Seed',seed));
-end
-p.seed = NaN;
-
-% compute N simulations
-orig_iters = iters;
-orig_split = p.split_trials;
-
-p.split_trials = 0;
-p.iters = max_tr;
-sim_all = cell(N,1);
-sim_all{1} = DDM_Kernel_Simulation(p);
-p.cut_off_RT = sim_all{1}.cut_off_RT; % match RT across simulations
-if p.parfor
-    parfor n=2:N
-        sim_all{n} = DDM_Kernel_Simulation(p);
-    end
-else
-    for n=2:N
-        sim_all{n} = DDM_Kernel_Simulation(p);
-    end
-end
-
-% average N simulations
-sim = sim_all{1};
-for n=2:N
-    sim.path.motion{1} = sim.path.motion{1} + sim_all{n}.path.motion{1};
-    sim.path.motion{2} = sim.path.motion{2} + sim_all{n}.path.motion{2};
-    sim.path.choice{1} = sim.path.choice{1} + sim_all{n}.path.choice{1};
-    sim.path.choice{2} = sim.path.choice{2} + sim_all{n}.path.choice{2};
-    sim.kernel.motion{1} = sim.kernel.motion{1} + sim_all{n}.kernel.motion{1};
-    sim.kernel.motion{2} = sim.kernel.motion{2} + sim_all{n}.kernel.motion{2};
-    sim.kernel.choice{1} = sim.kernel.choice{1} + sim_all{n}.kernel.choice{1};
-    sim.kernel.choice{2} = sim.kernel.choice{2} + sim_all{n}.kernel.choice{2};
-end
-sim.path.motion{1} = sim.path.motion{1}/N;
-sim.path.motion{2} = sim.path.motion{2}/N;
-sim.path.choice{1} = sim.path.choice{1}/N;
-sim.path.choice{2} = sim.path.choice{2}/N;
-sim.kernel.motion{1} = sim.kernel.motion{1}/N;
-sim.kernel.motion{2} = sim.kernel.motion{2}/N;
-sim.kernel.choice{1} = sim.kernel.choice{1}/N;
-sim.kernel.choice{2} = sim.kernel.choice{2}/N;
-
-sim.param.iters = orig_iters;
-sim.param.split_trials = orig_split;
-
-
 
 
 
