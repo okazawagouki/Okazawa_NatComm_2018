@@ -9,10 +9,6 @@ function sim = DDM_Kernel_Simulation(p)
 %            default values.
 %   Output:
 %       sim -> struct that contains simulation output.
-%       sim.path.stim{i}: average path of decision variable aligned to stimulus onset
-%                         when the model choice is i (1 or 2)
-%       sim.path.resp{i}: (RT task only) average path of decision variable aligned to response
-%                         when the model choice is i (1 or 2).
 %       sim.kernel.stim{i}: kernel aligned to stimulus onset when the model choice is i (1 or 2)
 %       sim.kernel.resp{i}: (RT task only) kernel aligned to response when the model choice is i (1 or 2).
 %       sim.bound_crossed_percent: percent the model crossed the bound
@@ -52,13 +48,6 @@ def.include_dec_frame = 1;  % whether to include the coherence exactly at the ti
                             % 0.. do not include the time when the bound crossed.
                             % >1 .. include the time after the bound cross (t-1 from the bound cross)
                             % <0 .. include only the time before the bound cross (t-1 from the bound cross)
-    %what to do with decision variable and momentary evidence vector when bound crossing happens 
-def.v_past_bound =  NaN; %can be 'bound' or NaN. choosing them depends on whether dealing with a RT or fix duration task. 
-                        %Choose NaN if you want a trial that reaches the bound not to contribute to average traces after bound crossing. 
-                        %Choose 'bound' if you want it to contribute but be fixed at the bound value
-def.s_past_bound =  NaN; %can be 'none' or NaN. choosing them depends on whether dealing with a RT or fix duration task.  
-                        %Choose NaN if you want a trial that reaches the bound not to contribute to average traces after bound crossing. 
-                        %Choose 'none' if you want it to contribute even past bound crossing. 
 def.cut_off_decision = false;   % if true, make a decision when the process reaches to t_max even when it does not reach the bounds.
 def.get_raw_data = false;   %whether to get raw S, DV, and other computed values.
 def.seed = NaN;
@@ -198,29 +187,12 @@ end
 est_dec_time(I) = RT(I) - p.subtract_time;
 
 
-    %determine what happens to decision variable and evidence traces after bound crossing 
+    %remove evidence trace after bound crossing
 for trial = find(bound_crossing)'
-    if any(isnan(p.v_past_bound))
-        %if you want to cut the path off after bound crossing 
-        t = est_dec_time(trial)+p.include_dec_frame;
-        if t < 1, t = 1; end
-        if t <= size(V,2)
-            V(trial, t:end) = NaN;
-        end
-    else
-        %if you want to clamp to the bound after bound crossing
-        t = est_dec_time(trial)+p.include_dec_frame;
-        if t < 1, t = 1; end
-        if t <= size(V,2)
-            V(trial,t:end) = p.bound_height(est_dec_time(trial),3-choice(trial)); %B(3-choice(trial));
-        end
-    end
-    if any(isnan(p.s_past_bound))
-        t = ceil(est_dec_time(trial)/p.t_frame)+p.include_dec_frame;
-        if t < 1, t = 1; end
-        if t <= size(Sb,2)
-            Sb(trial, t:end) = NaN;
-        end
+    t = ceil(est_dec_time(trial)/p.t_frame)+p.include_dec_frame;
+    if t < 1, t = 1; end
+    if t <= size(Sb,2)
+        Sb(trial, t:end) = NaN;
     end
 end
 
@@ -229,7 +201,7 @@ end
 sim.choice = nansum(choice==2)/sum(~isnan(choice));
 sim.medianRT = nanmedian(RT);
 sim.sdRT = nanstd(RT);
-    %average decision variable (path) aligned to stimulus onset
+
 bt_median = floor(nanmedian(est_dec_time));
 if isnan(bt_median) || bt_median > p.t_max 
     bt_median = p.t_max;
@@ -238,39 +210,28 @@ if isnan(p.cut_off_RT)
     bt_mediant = round(bt_median/p.t_frame);
 else
     bt_mediant = p.cut_off_RT;
-    bt_median = p.cut_off_RT * p.t_frame;
 end
 
 
-sim.path.stim{1} = nanmean(V(choice==1,1:bt_median),1);
-sim.path.stim{2} = nanmean(V(choice==2,1:bt_median),1);
     %psychophysical kernel aligned to stimulus onset
 sim.kernel.stim{1} = nanmean(Sb(choice==1,1:bt_mediant),1);
 sim.kernel.stim{2} = nanmean(Sb(choice==2,1:bt_mediant),1);
 
 
 if strcmp(p.termination_rule{1}, 'RT') % if RT task
-        %average decision variable and psychophysical kernel aligned to choice 
-    V_choice = nan(p.iters,bt_median);
+        %average psychophysical kernel aligned to choice 
     S_choice = nan(p.iters,bt_mediant);
     for trial = 1 : p.iters
         if bound_crossing(trial)==1
-            valid_portion = max(0,est_dec_time(trial)-bt_median)+1:est_dec_time(trial);
-            V_choice(trial,end-length(valid_portion)+1:end) = V(trial,valid_portion);
-
             st = max(0,round(est_dec_time(trial)/p.t_frame) - bt_mediant)+1;
             en = min(floor(p.t_max/p.t_frame), round(est_dec_time(trial)/p.t_frame));
-            valid_portion2 = st:en;
-            S_choice(trial,end-length(valid_portion2)+1:end) = Sb(trial,valid_portion2);
+            valid_portion = st:en;
+            S_choice(trial,end-length(valid_portion)+1:end) = Sb(trial,valid_portion);
         end
     end
-    sim.path.resp{1} = nanmean(V_choice(choice==1,:),1);
-    sim.path.resp{2} = nanmean(V_choice(choice==2,:),1);
     sim.kernel.resp{1} = nanmean(S_choice(choice==1,:),1);
     sim.kernel.resp{2} = nanmean(S_choice(choice==2,:),1);
 else
-    sim.path.resp{1} = [];
-    sim.path.resp{2} = [];
     sim.kernel.resp{1} = [];
     sim.kernel.resp{2} = [];
 end
