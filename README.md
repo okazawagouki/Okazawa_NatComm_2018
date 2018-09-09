@@ -4,6 +4,10 @@ This repository contains simulation code for the following paper:
 
 Okazawa G, Sha L, Purcell BA, Kiani R (2018). [Psychophysical reverse correlation reflects both sensory and decision-making processes](https://www.nature.com/articles/s41467-018-05797-y). *Nature Communications* 9:3479
 
+## Requirement
+
+The code is tested using MATLAB R2014b (MathWorks).
+
 ## Simulation code
 
 [DDM_Kernel_Simulation.m](./DDM_Kernel_Simulation.m): Run simulation of psychophysical kernel under the assumption of drift diffusion model.
