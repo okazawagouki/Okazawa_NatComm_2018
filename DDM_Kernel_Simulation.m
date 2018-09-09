@@ -39,19 +39,13 @@ def.k0 = 0;         % base drift of the accumulators, equivalent of **bias**
 def.B = [-30 30];   % lower and upper bounds (1 x 2) or (t_max x 2)
 def.B0 = 0;         % base line of the accumulators (correspond to bias)
 def.B0_SD = 0;      % fluctuation of baseline of the accumulators
-def.PriorProb = 0.5;  % Prior probability of crossing upper bound. 0.5 means no bias.
-def.LogPostOdd = NaN; % When prior probability is not 0.5, you should specify this.
 
 def.sigma = 1;      % standard deviation of fluctuation of stimuli
-def.signal_compress = NaN;  % non-linearity in signal. put function handle to define comporessing function.
 def.stim_noise = 0; % noise added to the stimulus fluctuation (sensory noise)
 def.dec_noise = 0;  % noise added to decision variable (decision noise)
 def.w = 1;          % weight (1 x 1) or (t_max x 1)
 def.non_dec_time = 0;    % average non-decision time
 def.non_dec_time_sd = 0; % SD of non-decision time
-def.non_dec_time_dist = 'normal'; % shape of non-decision time distribution. 'normal' or 'log normal'.
-def.non_dec_logn_sigma = 1; % in case of log normal distribution, larger absolute value increase the skewness.
-                            % negative value makes skew toward the opposite direction.
 def.subtract_time = 0;   % Time subtracted from RT during kernel analysis to compensate for non-decision time
 def.include_dec_frame = 1;  % whether to include the coherence exactly at the time of crossing bound.
                             % 1.. include the time when the bound crossed.
@@ -97,11 +91,6 @@ else
     p = rmfield(p, 'w');
 end
 
-if p.PriorProb ~= .5 && isnan(p.LogPostOdd(1))
-    error('If PriorProb is not 0.5, you should specify LogPostOdds');
-end
-
-
 sim = struct();
 
 if ~isnan(p.seed)
@@ -131,11 +120,6 @@ S = reshape(S', [ceil(p.t_max/p.t_frame)*p.t_frame, p.iters])';
 S = S * p.k + p.k0;
 Sb = (Sb - k)';
 
-    %non-linear compression of signal
-if isa(p.signal_compress, 'function_handle')
-    S = p.signal_compress(S);
-end
-
     %apply temporal weights
 V = (S + randn(size(S)) * p.stim_noise) .* repmat(p.weight, [p.iters 1]);
     %add the initial value
@@ -147,12 +131,6 @@ V = V + randn(size(V)) * p.dec_noise;
 
     %calculate the cumulative evidence
 V = cumsum(V, 2);
-
-    %add prior probability
-if p.PriorProb ~= .5
-    Pr = log(p.PriorProb/(1-p.PriorProb)) ./ p.LogPostOdd(:) .* p.bound_height(:,2);
-    V = V + ones(size(V,1),1) * Pr';
-end
 
     %find the choice and bound crossing time for each trial 
 choice = nan(p.iters, 1);
@@ -204,14 +182,7 @@ end
 
     % determine RT  
 if strcmp(p.termination_rule{1}, 'RT') % if RT task, RT is decision time + non decision time
-    if strcmp(p.non_dec_time_dist, 'normal')
-        RT = true_dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
-    elseif strcmp(p.non_dec_time_dist, 'log normal')
-        nRT = random('logn', zeros(size(RT)), ones(size(RT)) * abs(p.non_dec_logn_sigma));
-        nRT = nRT * sign(p.non_dec_logn_sigma);
-        nRT = (nRT - mean(nRT))/std(nRT)*p.non_dec_time_sd + p.non_dec_time;
-        RT = true_dec_time + round(nRT);
-    end
+    RT = true_dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
     RT(RT<=0) = 0; % clip at 0
 
     if ~p.cut_off_decision
@@ -220,16 +191,8 @@ if strcmp(p.termination_rule{1}, 'RT') % if RT task, RT is decision time + non d
         bound_crossing(idx) = 0;
     end
 elseif strcmp(p.termination_rule{1}, 'Fixed') % if fixed duration task, RT is stimulus duration + non decision time
-    if strcmp(p.non_dec_time_dist, 'normal')
-        ndec =  p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
-        ndec(ndec<0)=0;
-        RT = p.termination_rule{2} + ndec;
-    elseif strcmp(p.non_dec_time_dist, 'log normal')
-        nRT = random('logn', zeros(size(RT)), ones(size(RT)) * abs(p.non_dec_logn_sigma));
-        nRT = nRT * sign(p.non_dec_logn_sigma);
-        nRT = (nRT - mean(nRT))/std(nRT)*p.non_dec_time_sd + p.non_dec_time;
-        RT = p.termination_rule{2} + round(nRT);
-    end
+    RT = p.termination_rule{2} + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
+    RT(RT<=0) = 0; % clip at 0
 end
 
 est_dec_time(I) = RT(I) - p.subtract_time;

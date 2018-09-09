@@ -26,6 +26,7 @@ yrange = 0:1:3;
 %% Run simulation
 
 % Fixed duration task
+p.iters = 1e4;
 p.termination_rule = {'Fixed', 1000}; % 1000ms
 p.B = [-30 30]; % Bound
 p.non_dec_time = 0;
@@ -36,6 +37,7 @@ fix_sim = DDM_Kernel_Simulation(p);
 
 % RT task without non-decision time
 clear p;
+p.iters = 1e4;
 p.termination_rule = {'RT', NaN};
 p.t_max = 5000;
 p.B = [-30 30]; % Bound
@@ -47,6 +49,7 @@ RT_sim = DDM_Kernel_Simulation(p);
 
 % RT task with non-decision time
 clear p;
+p.iters = 1e4;
 p.termination_rule = {'RT', NaN};
 p.t_max = 5000;
 p.B = [-30 30]; % Bound

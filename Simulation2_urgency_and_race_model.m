@@ -25,6 +25,7 @@ yrange = 0:1:3;
 %% Run simulation
 
 % DDM with urgency
+p.iters = 1e4;
 p.t_max = 10000;
 B = 80;
 urg_half = 700;
@@ -39,6 +40,7 @@ urg_sim = DDM_Kernel_Simulation(p);
 
 % Race: input correlation
 clear p;
+p.iters = 1e4;
 p.t_max = 10000;
 p.B = [-30 30];
 p.rB = [Inf -Inf];
@@ -55,6 +57,7 @@ input_sim = RACE_Kernel_Simulation(p);
 
 % Race: reflective bound
 clear p;
+p.iters = 1e4;
 p.t_max = 10000;
 p.B = [-30 30];
 p.rB = [10, -10];
@@ -69,6 +72,7 @@ reflect_sim = RACE_Kernel_Simulation(p);
 
 % Race: leak and mutual inhibition
 clear p;
+p.iters = 1e4;
 p.t_max = 10000;
 p.stim_noise = 0;
 p.B = [-60 60];

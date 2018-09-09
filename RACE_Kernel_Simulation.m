@@ -45,13 +45,11 @@ def.decay = 0; % 0= no decay. 1=very strong decay.
 def.booster = 0; % constant input to balance the inhibition and excitation.
 
 def.sigma = 1;      % standard deviation of fluctuation of stimuli
-def.signal_compress = NaN;  % non-linearity in signal. put function handle to define comporessing function.
 def.stim_noise = 0; % noise added to the stimulus fluctuation (sensory noise)
 def.dec_noise = 0;  % noise added to decision variable (decision noise)
 def.w = 1;          % weight (1 x 1) or (t_max x 1)
 def.non_dec_time = 0;    % average non-decision time
 def.non_dec_time_sd = 0; % SD of non-decision time
-def.non_dec_time_dist = 'normal'; % shape of non-decision time distribution. 'normal' or 'log normal'.
 def.subtract_time = 0;   % Time subtracted from RT during kernel analysis to compensate for non-decision time
 def.include_dec_frame = 1;  % whether to include the coherence exactly at the time of crossing bound.
                             % 1.. include the time when the bound crossed.
@@ -129,11 +127,6 @@ S = reshape(S', [ceil(p.t_max/p.t_frame)*p.t_frame, p.iters])';
 S = S * p.k + p.k0;
 Sb = (Sb - k)';
 
-    %non-linear compression of signal
-if isa(p.signal_compress, 'function_handle')
-    S = p.signal_compress(S);
-end
-
     %apply temporal weights
 if p.stim_noise == 0
     if p.rho ~= -1
@@ -141,7 +134,8 @@ if p.stim_noise == 0
     end
     noise_rho = -1;
 else
-    noise_rho = (p.rho * (1 + p.stim_noise^2) + 1)/(p.stim_noise^2); % see Race_model_correlation_math.docx
+    noise_rho = (p.rho * (1 + p.stim_noise^2) + 1)/(p.stim_noise^2);
+        % conversion of the total rho to rho of noise input only
 end
 Noise = mvnrnd(zeros(length(S(:)),2),[1 noise_rho; noise_rho 1] * (p.stim_noise^2));
 V1 = (S) .* repmat(p.weight, [p.iters 1]) + reshape(Noise(:,1), size(S));
@@ -220,13 +214,7 @@ end
 
     % determine RT  
 if strcmp(p.termination_rule{1}, 'RT') % if RT task, RT is decision time + non decision time
-    if strcmp(p.non_dec_time_dist, 'normal')
-        RT = true_dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
-    elseif strcmp(p.non_dec_time_dist, 'log normal')
-        ev = @(x)abs(std(random('logn', ones(10000,1) * log(p.non_dec_time), ones(10000,1) * x)) - p.non_dec_time_sd);
-        logsd = fminsearch(ev, 0.3);
-        RT = true_dec_time + round(random('logn', ones(size(RT)) * log(p.non_dec_time), ones(size(RT)) * logsd));
-    end
+    RT = true_dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
     RT(RT<=0) = 0; % clip at 0
 
     if ~p.cut_off_decision
@@ -235,13 +223,8 @@ if strcmp(p.termination_rule{1}, 'RT') % if RT task, RT is decision time + non d
         bound_crossing(idx) = 0;
     end
 elseif strcmp(p.termination_rule{1}, 'Fixed') % if fixed duration task, RT is stimulus duration + non decision time
-    if strcmp(p.non_dec_time_dist, 'normal')
-        RT = p.termination_rule{2} + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
-    elseif strcmp(p.non_dec_time_dist, 'log normal')
-        ev = @(x)abs(std(random('logn', ones(10000,1) * log(p.non_dec_time), ones(10000,1) * x)) - p.non_dec_time_sd);
-        logsd = fminsearch(ev, 0.3);
-        RT = p.termination_rule{2} + round(random('logn', ones(size(RT)) * log(p.non_dec_time), ones(size(RT)) * logsd));
-    end
+    RT = p.termination_rule{2} + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
+    RT(RT<=0) = 0; % clip at 0
 end
 
 est_dec_time(I) = RT(I) - p.subtract_time;
