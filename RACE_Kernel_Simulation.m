@@ -1,20 +1,20 @@
 function sim = RACE_Kernel_Simulation(p)
 % function sim = RACE_Kernel_Simulation(p)
-%   Main code to run simulation of psychophysical reverse correlation under
+%   run a simulation of psychophysical reverse correlation under
 %   the assumption of race model.
 %
 %   Input:
-%       p -> struct to define model parameters.
-%            see the code below for the available parameters and their
+%       p -> a structure defining model parameters.
+%            see below for the available parameters and their
 %            default values.
 %   Output:
-%       sim -> struct that contains simulation output.
+%       sim -> a structure that contains simulation output.
 %       sim.kernel.stim{i}: kernel aligned to stimulus onset when the model choice is i (1 or 2)
 %       sim.kernel.resp{i}: (RT task only) kernel aligned to response when the model choice is i (1 or 2).
 %       sim.bound_crossed_percent: percent the model crossed the bound
 %                       within the simulated time (should be close to 100% to obtain an accurate result).
 %       sim.cut_off_RT: the duration of kernel (default: cut off at median reaction time).
-%       sim.param : parameters used to run the simulation (input p).
+%       sim.param : parameters used to run the simulation (i.e. input p).
 %
 %
 % Copyright (2018), Kiani Lab, NYU
@@ -22,11 +22,8 @@ function sim = RACE_Kernel_Simulation(p)
 %% default parameters
 def.iters = 10000;   % number of simulated trials
 def.t_max = 5000;    % number of simulated time steps in each trial (ms)
-
 def.dt = 1;         % time unit, in ms
-def.t_frame = 1;   % duration of one noise frame
 
-def.termination_rule = {'RT', NaN}; % rule RT task:{'RT',NaN}, fixed:{'Fixed', stim_duration}
 
 def.coh = 0;    % coherence (if not scalar, coh is randomly chosen from vectors for eath trial)
 def.k = 1;      % sensitivity parameter (drift rate = coh * k)
@@ -34,36 +31,32 @@ def.k0 = 0;         % base drift of the accumulators, equivalent of **bias**
 def.B = [-30 30];   % lower and upper bounds (1 x 2) or (t_max x 2)
 def.rB = [Inf -Inf]; % reflection bound (1 x 2) or (t_max x 2)
 def.B0 = 0;         % base line of the accumulators (correspond to bias)
-
 def.rho = -1;   % correlation between the two decision variables (-1 = diffusion model)
 def.interaction = 0; % 0= no interaction. 1=very strong interaction.
 def.decay = 0; % 0= no decay. 1=very strong decay.
 def.booster = 0; % constant input to balance the inhibition and excitation.
-
 def.sigma = 1;      % standard deviation of fluctuation of stimuli
 def.stim_noise = 0; % noise added to the stimulus fluctuation (sensory noise)
 def.dec_noise = 0;  % noise added to decision variable (decision noise)
 def.w = 1;          % weight (1 x 1) or (t_max x 1)
 def.non_dec_time = 0;    % average non-decision time
 def.non_dec_time_sd = 0; % SD of non-decision time
-def.subtract_time = 0;   % Time subtracted from RT during kernel analysis to compensate for non-decision time
-def.include_dec_frame = 1;  % whether to include the coherence exactly at the time of crossing bound.
-                            % 1.. include the time when the bound crossed.
-                            % 0.. do not include the time when the bound crossed.
-                            % >1 .. include the time after the bound cross (t-1 from the bound cross)
-                            % <0 .. include only the time before the bound cross (t-1 from the bound cross)
+def.termination_rule = {'RT', NaN}; % rule RT task:{'RT',NaN}, fixed:{'Fixed', stim_duration}
 def.cut_off_decision = false;   % if true, make a decision when the process reaches to t_max even when it does not reach the bounds.
-def.get_raw_data = false;   %whether to get raw S, DV, and other computed values.
-def.seed = NaN;
 
+def.seed = NaN; % If specified, use this value to initialize matlab random
 def.cut_off_RT = nan; % explicitly determine cut off RT (otherwise, median RT will be the cut off time)
-def.error_no_reach = true; % end the program with error when less than 95% of trials reach the bound.
 
 %% setup
 if nargin < 1
     p = def;
 else
-    p = safeStructAssign(def, p);
+    fs = fieldnames(def);
+    for n=1:length(fs)
+        if ~isfield(p, fs{n})
+            p.(fs{n}) = def.(fs{n});
+        end
+    end
 end
 
 sttime = tic;
@@ -73,7 +66,6 @@ if size(p.B,1) == 1
     p.bound_height = repmat(p.B,[p.t_max,1]);
 else
     p.bound_height = p.B;
-    p = rmfield(p, 'B');
 end
 p.bound_height(:,1) = -p.bound_height(:,1); % flip bound sign (because this is a race model)
 rB = p.rB;
@@ -84,7 +76,6 @@ if length(p.w) == 1
     p.weight = ones(1, p.t_max) * p.w;
 else
     p.weight = p.w;
-    p = rmfield(p, 'w');
 end
 
 sim = struct();
@@ -101,20 +92,18 @@ if isscalar(p.coh)
 else
     idx = ceil(rand(1, p.iters) * length(p.coh));
     p.coh = p.coh(:)';
-    coh = ones(ceil(p.t_max/p.t_frame),1) * p.coh(idx);
+    coh = ones(p.t_max,1) * p.coh(idx);
 end
 k = coh * p.dt;
 s = p.sigma * sqrt(p.dt);
 
   % stimulus fluctuation
-  % Sb .. stimulus fluctuation subtracted mean coherence level. Temporal resolution = t_frame ms.
-  % S .. real stimulus values (sensory evidence) used in DDM. Temporal resolution = 1ms.
+  % Sf .. stimulus fluctuation subtracted mean coherence level
+  % E .. sensory evidence.
   % for the kernel analysis, Sb will be used.
-Sb = normrnd(k, s, [ceil(p.t_max/p.t_frame), p.iters]); % Sb = base
-S = Sb(:) * ones(1, p.t_frame); % S = S of 1ms resolution
-S = reshape(S', [ceil(p.t_max/p.t_frame)*p.t_frame, p.iters])';
-S = S * p.k + p.k0;
-Sb = (Sb - k)';
+Sf = normrnd(k, s, [p.t_max, p.iters]); % Sb = base
+E = Sf' * p.k + p.k0;
+Sf = (Sf - k)';
 
     %apply temporal weights
 if p.stim_noise == 0
@@ -126,13 +115,11 @@ else
     noise_rho = (p.rho * (1 + p.stim_noise^2) + 1)/(p.stim_noise^2);
         % conversion of the total rho to rho of noise input only
 end
-Noise = mvnrnd(zeros(length(S(:)),2),[1 noise_rho; noise_rho 1] * (p.stim_noise^2));
-V1 = (S) .* repmat(p.weight, [p.iters 1]) + reshape(Noise(:,1), size(S));
-V2 = (-S) .* repmat(p.weight, [p.iters 1]) + reshape(Noise(:,2), size(S));
-clear Noise;
-if ~p.get_raw_data
-    clear S;
-end
+Noise = mvnrnd(zeros(length(E(:)),2),[1 noise_rho; noise_rho 1] * (p.stim_noise^2));
+V1 = (E  + reshape(Noise(:,1), size(E))) .* repmat(p.weight, [p.iters 1]);
+V2 = (-E + reshape(Noise(:,2), size(E))) .* repmat(p.weight, [p.iters 1]);
+clear Noise E;
+
     %add the initial value
 V1(:,1) = V1(:,1) + p.B0;
 V2(:,1) = V2(:,1) + p.B0;
@@ -157,53 +144,41 @@ clear V1 V2;
 choice = nan(p.iters, 1);
 bound_crossing = zeros(p.iters, 1);
 RT = nan(p.iters, 1); % reaction time including non-decision time
-true_dec_time = nan(p.iters, 1); % the exact timing of decision (bound crossing)
-est_dec_time = nan(p.iters, 1); % decision time estimated in kernel analysis (RT - p.subtract_time)
+dec_time = nan(p.iters, 1); % the exact timing of decision (bound crossing)
 
-    %first find trials in which bound crossing took place
-[I, J] = find(V1c>=repmat(p.bound_height(:,1)',[p.iters 1]) | V2c>=repmat(p.bound_height(:,2)',[p.iters 1]));
-    %now find the first bound crossing time on these trials, ultimately we'd like to be
-    %have an index to the trials with bound crossing. Also, J must be be the first time
-    %of bound crossing on those trials 
-if getMatlabVersion<8.3
-    [I,ind] = sort(I, 1, 'ascend');
-    I = flipud(I);
-    J = flipud(J(ind));
-    [I,ind] = unique(I);
-    J = J(ind);
-else
-    [I,ind] = sort(I, 1, 'ascend');
-    J = J(ind);
-    [I,ind] = unique(I);
-    J = J(ind);
+
+    %find bound crossing
+for tr=1:p.iters
+    t = find(V1c(tr,:)>=p.bound_height(:,1)' | V2c(tr,:)>=p.bound_height(:,2)', 1);
+    if ~isempty(t)
+        bound_crossing(tr) = 1;
+        dec_time(tr) = t;
+        if V1c(tr,t) >= p.bound_height(t,1)
+            choice(tr) = 1;
+        else
+            choice(tr) = 2;
+        end
+    end
 end
-
-    % determine choice & true decision time
-bound_crossing(I) = 1;
-L = V1c(sub2ind(size(V1c),I,J)) >= p.bound_height(J,1);
-choice(I(L)) = 1;
-L = V2c(sub2ind(size(V2c),I,J)) >= p.bound_height(J,2);
-choice(I(L)) = 2;
-true_dec_time(I) = J;
 
 if strcmp(p.termination_rule{1}, 'Fixed') % in case of fixed duration task
     nI = find(bound_crossing==0);
     L = V1c(nI, p.termination_rule{2}) >= V2c(nI, p.termination_rule{2});
     choice(nI(L)) = 1;
     choice(nI(~L)) = 2;
-    true_dec_time(nI) = p.termination_rule{2};
+    dec_time(nI) = p.termination_rule{2};
 end
 if p.cut_off_decision
     nI = find(bound_crossing==0);
     L = V1c(nI, end) >= V2c(nI, end);
     choice(nI(L)) = 1;
     choice(nI(~L)) = 2;
-    true_dec_time(nI) = p.t_max;
+    dec_time(nI) = p.t_max;
 end
 
     % determine RT  
 if strcmp(p.termination_rule{1}, 'RT') % if RT task, RT is decision time + non decision time
-    RT = true_dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
+    RT = dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
     RT(RT<=0) = 0; % clip at 0
 
     if ~p.cut_off_decision
@@ -216,15 +191,13 @@ elseif strcmp(p.termination_rule{1}, 'Fixed') % if fixed duration task, RT is st
     RT(RT<=0) = 0; % clip at 0
 end
 
-est_dec_time(I) = RT(I) - p.subtract_time;
-
 
     %remove evidence trace after bound crossing
 for trial = find(bound_crossing)'
-    t = ceil(est_dec_time(trial)/p.t_frame)+p.include_dec_frame;
+    t = RT(trial)+1;
     if t < 1, t = 1; end
-    if t <= size(Sb,2)
-        Sb(trial, t:end) = NaN;
+    if t <= size(Sf,2)
+        Sf(trial, t:end) = NaN;
     end
 end
 
@@ -233,30 +206,30 @@ end
 sim.choice = nansum(choice==2)/sum(~isnan(choice));
 sim.medianRT = nanmedian(RT);
 sim.sdRT = nanstd(RT);
-bt_median = floor(nanmedian(est_dec_time));
-if isnan(bt_median) || bt_median > p.t_max 
-    bt_median = p.t_max;
-end
-if isnan(p.cut_off_RT)
-    bt_mediant = round(bt_median/p.t_frame);
-else
-    bt_mediant = p.cut_off_RT;
-end
 
+
+if isnan(p.cut_off_RT)
+    cut_off_RT = floor(nanmedian(RT));
+    if isnan(cut_off_RT) || cut_off_RT > p.t_max 
+        cut_off_RT = p.t_max;
+    end
+else
+    cut_off_RT = p.cut_off_RT;
+end
 
     %psychophysical kernel aligned to stimulus onset
-sim.kernel.stim{1} = nanmean(Sb(choice==1,1:bt_mediant),1);
-sim.kernel.stim{2} = nanmean(Sb(choice==2,1:bt_mediant),1);
+sim.kernel.stim{1} = nanmean(Sf(choice==1,1:cut_off_RT),1);
+sim.kernel.stim{2} = nanmean(Sf(choice==2,1:cut_off_RT),1);
 
 if strcmp(p.termination_rule{1}, 'RT') % if RT task
     %average psychophysical kernel aligned to choice 
-    S_choice = nan(p.iters,bt_mediant);
+    S_choice = nan(p.iters,cut_off_RT);
     for trial = 1 : p.iters
         if bound_crossing(trial)==1
-            st = max(0,round(est_dec_time(trial)/p.t_frame) - bt_mediant)+1;
-            en = min(floor(p.t_max/p.t_frame), round(est_dec_time(trial)/p.t_frame));
+            st = max(0,RT(trial) - cut_off_RT)+1;
+            en = min(p.t_max, RT(trial));
             valid_portion = st:en;
-            S_choice(trial,end-length(valid_portion)+1:end) = Sb(trial,valid_portion);
+            S_choice(trial,end-length(valid_portion)+1:end) = Sf(trial,valid_portion);
         end
     end
     sim.kernel.resp{1} = nanmean(S_choice(choice==1,:),1);
@@ -267,27 +240,12 @@ else
 end
 
 sim.bound_crossed_percent = sum(bound_crossing)/length(bound_crossing) * 100;
-sim.cut_off_RT = bt_mediant;
+sim.cut_off_RT = cut_off_RT;
 sim.param = p;
 
-if p.get_raw_data
-    sim.Sb = Sb;
-    sim.S = S;
-    sim.V1c = V1c;
-    sim.V2c = V2c;
-    sim.bound_crossing = bound_crossing;
-    sim.response = choice;
-    sim.RT = RT;
-    sim.est_dec_time = est_dec_time;
-    sim.true_dec_time = true_dec_time;
-    sim.coh = coh(1,:)'; % coherence level
-end
-
 fprintf('\tpercent cross bound: %1.1f%%, median RT = %1.3f (time spent %1.1fsec)\n', sim.bound_crossed_percent, nanmedian(RT), toc(sttime));
-if sim.bound_crossed_percent < 95
-    if p.error_no_reach
-        error('Bound crossed percent is less than 95%. You should use longer t_max');
-    end
+if sim.bound_crossed_percent < 99
+    warning('Less than 99% of trials crossed the bound. The result could be inaccurate.');
 end
 
 

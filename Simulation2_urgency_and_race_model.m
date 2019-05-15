@@ -1,31 +1,28 @@
 
 %% Simulation2_urgency_and_race_model
 %
-% This script shows psychophysical kernel under DDM with urgency and under race model
+% This script shows psychophysical kernels under DDM with urgency and under race model
 % (corresponds to Fig. 6 in the paper).
 %
-% The original simulation is computationally intensive (10^6 trials). As a
-% short cut, this script runs a smaller number of trials (10^4) but applys
-% a boxcar smoothing (50 ms) to reduce the noise in kernel. For the actual
-% production of the result, no smoothing should be applied.
-% 
+% The original simulation is time consuming (runs 10^6 trials). As a
+% workaround, this script runs a smaller number of trials (10^4) but applys
+% a boxcar smoothing (50 ms) to reduce the noise in kernel. 
+% No smoothing should be applied for the actual simulation.
 %
 %
 % Copyright, Kiani Lab, NYU
 
-%% Initialize
+%% Parameters
 clear;
 
+Niters = 1e4;
 smoothing_wid = 50; %ms
-xrange = [0 1200];
-yrange = 0:1:3;
-
 
 
 %% Run simulation
 
 % DDM with urgency
-p.iters = 1e4;
+p.iters = Niters;
 p.t_max = 10000;
 B = 80;
 urg_half = 700;
@@ -35,12 +32,12 @@ p.B = [-B+b(:), B-b(:)]; % Bound
 p.non_dec_time = 0;
 p.cut_off_RT = 1000;
 
-fprintf('Running DDM with urgency simulation...\n');
+fprintf('Running DDM with urgency...\n');
 urg_sim = DDM_Kernel_Simulation(p);
 
 % Race: input correlation
 clear p;
-p.iters = 1e4;
+p.iters = Niters;
 p.t_max = 10000;
 p.B = [-30 30];
 p.rB = [Inf -Inf];
@@ -51,13 +48,13 @@ p.stim_noise = 1;
 p.non_dec_time = 0;
 p.cut_off_RT = 1000;
 
-fprintf('Running Race model with input correlation 0.2...\n');
+fprintf('Running race model with input correlation 0.2...\n');
 input_sim = RACE_Kernel_Simulation(p);
 
 
 % Race: reflective bound
 clear p;
-p.iters = 1e4;
+p.iters = Niters;
 p.t_max = 10000;
 p.B = [-30 30];
 p.rB = [10, -10];
@@ -66,13 +63,13 @@ p.interaction = 0;
 p.non_dec_time = 0;
 p.cut_off_RT = 1000;
 
-fprintf('Running Race model with reflective bound -10...\n');
+fprintf('Running race model with reflective bound -10...\n');
 reflect_sim = RACE_Kernel_Simulation(p);
 
 
 % Race: leak and mutual inhibition
 clear p;
-p.iters = 1e4;
+p.iters = Niters;
 p.t_max = 10000;
 p.stim_noise = 0;
 p.B = [-60 60];
@@ -85,12 +82,14 @@ p.booster = p.B0 * (p.interaction + p.decay);
 p.non_dec_time = 0;
 p.cut_off_RT = 1000;
 
-fprintf('Running Race model with leak/mutual inhibition = 1...\n');
+fprintf('Running race model with leak/mutual inhibition = 1...\n');
 lm_sim = RACE_Kernel_Simulation(p);
 
 
 %% Show figure
 figure('color', 'w', 'position', [100 100 400 700]);
+xrange = [0 1200];
+yrange = 0:1:3;
 
 subplot(4,2,1);
 show_kernel(urg_sim, 'stim', smoothing_wid, xrange, yrange);

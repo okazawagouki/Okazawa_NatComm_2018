@@ -6,18 +6,19 @@ Okazawa G, Sha L, Purcell BA, Kiani R (2018). [Psychophysical reverse correlatio
 
 ## Requirement
 
-The code is tested using MATLAB R2014b (MathWorks).
+The code is tested under MATLAB R2018a (MathWorks).
 
-## Simulation code
+## Main code
 
-[DDM_Kernel_Simulation.m](./DDM_Kernel_Simulation.m): Run simulation of psychophysical kernel under the assumption of drift diffusion model.
-[RACE_Kernel_Simulation.m](./RACE_Kernel_Simulation.m): Run simulation of psychophysical kernel under the assumption of competing accumulator model.
+[DDM_Kernel_Simulation.m](./DDM_Kernel_Simulation.m): This code generates a psychophysical kernel based on drift diffusion model.
+
+[RACE_Kernel_Simulation.m](./RACE_Kernel_Simulation.m): This code generates a psychophysical kernel based on competing accumulator (race) model.
 
 ## Script
 
-[Simulation1_fixed_and_RT_task.m](./Simulation1_fixed_and_RT_task.m): Shows psychophysical kernel under fixed duration and reaction time and the effect of non-decision time (corresponds to Fig. 3 in the paper).
+[Simulation1_fixed_and_RT_task.m](./Simulation1_fixed_and_RT_task.m): The script shows psychophysical kernels for DDM with/without the non-decision time under fixed duration/reaction time tasks (corresponds to Fig. 3 in the paper).
 
-[Simulation2_urgency_and_race_model.m](./Simulation2_urgency_and_race_model.m): Shows psychophysical kernel under drift diffusion model with urgency and competing accumulator model with input correlation, reflective bound, and leak/mutual inhibition (corresponds to Fig. 6 in the paper).
+[Simulation2_urgency_and_race_model.m](./Simulation2_urgency_and_race_model.m): The script shows psychophysical kernels for drift diffusion model with urgency and competing accumulator model with input correlation, reflective bound, and leak/mutual inhibition (corresponds to Fig. 6 in the paper).
 
 ## License
 

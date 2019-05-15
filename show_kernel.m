@@ -33,15 +33,14 @@ switch alignment_type
              'box', 'off', 'tickdir', 'out', 'ticklen', [.03 .03]);
         axis square;
         ylabel('Weight', 'fontsize', 10);
-        set(gca, 'xticklabel', makeTickLabel(0:250:1000, 500));
+        set(gca, 'xticklabel', {'0', '', '500', '', '1000'});
         xlabel({'Time from', 'stimulus onset (ms)'}, 'fontsize', 10);
     case 'resp'
         plot((-kernel_len+1):1:0, kernel(end-kernel_len+1:end), 'linew', 2, 'color', 'k');
         set(gca, 'xlim', [-1200 -20], 'xtick', -1000:250:0, 'xticklabel', [], 'ylim', yrange([1 end]), 'ytick', yrange,...
              'YAxisLocation', 'right', 'box', 'off', 'tickdir', 'out', 'ticklen', [.03 .03]);
         axis square;
-        set(gca, 'xticklabel', makeTickLabel(-1000:250:0, 500));
-        xlabel({'Time from', 'stimulus onset (ms)'}, 'fontsize', 10);
-        ylabel('Weight', 'fontsize', 10);
+        set(gca, 'xticklabel',{'-1000', '', '-500', '', '0'});
+        xlabel({'Time from', 'response onset (ms)'}, 'fontsize', 10);
 end
 
