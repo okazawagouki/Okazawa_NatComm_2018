@@ -135,7 +135,7 @@ if strcmp(p.termination_rule{1}, 'RT') % if RT task, RT is decision time + non d
     RT = dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
     RT(RT<=0) = 0; % clip at 0
 
-    idx = RT >= p.t_max;
+    idx = RT > p.t_max;
     RT(idx) = NaN; % remove trials whose decision time is larger than stimulus duration or smaller than 0.
     bound_crossing(idx) = 0;
 elseif strcmp(p.termination_rule{1}, 'Fixed') % if fixed duration task, RT is stimulus duration + non decision time
@@ -145,11 +145,10 @@ end
 
 
     %remove sensory fluctuation after bound crossing
-for trial = find(bound_crossing)'
-    t = RT(trial)+1;
-    if t < 1, t = 1; end
-    if t <= size(Sf,2)
-        Sf(trial, t:end) = NaN;
+for tr = find(bound_crossing)'
+    t = RT(tr)+1;
+    if t >= 1 && t <= size(Sf,2)
+        Sf(tr, t:end) = NaN;
     end
 end
 
@@ -177,12 +176,12 @@ sim.kernel.stim{2} = nanmean(Sf(choice==2,1:cut_off_RT),1);
 if strcmp(p.termination_rule{1}, 'RT') % if RT task
         %average psychophysical kernel aligned to choice 
     S_choice = nan(p.iters,cut_off_RT);
-    for trial = 1 : p.iters
-        if bound_crossing(trial)==1
-            st = max(0,RT(trial) - cut_off_RT)+1;
-            en = min(p.t_max, RT(trial));
+    for tr = 1 : p.iters
+        if bound_crossing(tr)==1
+            st = max(0,RT(tr) - cut_off_RT)+1;
+            en = min(p.t_max, RT(tr));
             valid_portion = st:en;
-            S_choice(trial,end-length(valid_portion)+1:end) = Sf(trial,valid_portion);
+            S_choice(tr,end-length(valid_portion)+1:end) = Sf(tr,valid_portion);
         end
     end
     sim.kernel.resp{1} = nanmean(S_choice(choice==1,:),1);
