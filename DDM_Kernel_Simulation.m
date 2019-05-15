@@ -25,7 +25,7 @@ def.iters = 10000;   % number of simulated trials
 def.t_max = 5000;    % number of simulated time steps in each trial (ms)
 def.dt = 1;         % time unit, in ms
 
-def.coh = 0;    % coherence (if vector, coh is randomly chosen from the vector for eath trial)
+def.coh = 0;    % stimulus strength
 def.k = 1;      % sensitivity parameter (drift rate = coh * k)
 def.k0 = 0;         % base drift of the accumulators, equivalent of **bias**
 def.B = [-30 30];   % lower and upper bounds (1 x 2) or (t_max x 2)
@@ -38,7 +38,6 @@ def.w = 1;          % weight (1 x 1) or (t_max x 1)
 def.non_dec_time = 0;    % average non-decision time
 def.non_dec_time_sd = 0; % SD of non-decision time
 def.termination_rule = {'RT', NaN}; % rule RT task:{'RT',NaN}, fixed:{'Fixed', stim_duration}
-def.cut_off_decision = false;   % if true, make a decision when the process reaches to t_max even when it does not reach the bounds.
 
 def.seed = NaN; % If specified, use this value to initialize matlab random
 def.cut_off_RT = nan; % explicitly determine cut off RT (otherwise, median RT will be the cut off time)
@@ -80,14 +79,7 @@ end
 
 %% run simulation
     % create stimuli
-if isscalar(p.coh)
-    coh = p.coh;
-else
-    idx = ceil(rand(1, p.iters) * length(p.coh));
-    p.coh = p.coh(:)';
-    coh = ones(p.t_max,1) * p.coh(idx);
-end
-k = coh * p.dt;
+k = p.coh * p.dt;
 s = p.sigma * sqrt(p.dt);
 
   % stimulus fluctuation
@@ -137,31 +129,22 @@ if strcmp(p.termination_rule{1}, 'Fixed') % in case of fixed duration task
     choice(nI(~L)) = 2;
     dec_time(nI) = p.termination_rule{2};
 end
-if p.cut_off_decision
-    nI = find(bound_crossing==0);
-    L = V(nI,end) >= 0;
-    choice(nI(L)) = 1;
-    choice(nI(~L)) = 2;
-    dec_time(nI) = p.t_max;
-end
 
-    % determine RT  
+    % determine RT
 if strcmp(p.termination_rule{1}, 'RT') % if RT task, RT is decision time + non decision time
     RT = dec_time + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
     RT(RT<=0) = 0; % clip at 0
 
-    if ~p.cut_off_decision
-        idx = RT >= p.t_max;
-        RT(idx) = NaN; % remove trials whose decision time is larger than stimulus duration or smaller than 0.
-        bound_crossing(idx) = 0;
-    end
+    idx = RT >= p.t_max;
+    RT(idx) = NaN; % remove trials whose decision time is larger than stimulus duration or smaller than 0.
+    bound_crossing(idx) = 0;
 elseif strcmp(p.termination_rule{1}, 'Fixed') % if fixed duration task, RT is stimulus duration + non decision time
     RT = p.termination_rule{2} + p.non_dec_time + round(randn(size(RT)) * p.non_dec_time_sd);
     RT(RT<=0) = 0; % clip at 0
 end
 
 
-    %remove evidence trace after bound crossing
+    %remove sensory fluctuation after bound crossing
 for trial = find(bound_crossing)'
     t = RT(trial)+1;
     if t < 1, t = 1; end
