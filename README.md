@@ -16,9 +16,9 @@ The code is tested under MATLAB R2018a (MathWorks).
 
 ## Script
 
-[Simulation1_fixed_and_RT_task.m](./Simulation1_fixed_and_RT_task.m): The script shows psychophysical kernels for DDM with/without the non-decision time under fixed duration/reaction time tasks (corresponds to Fig. 3 in the paper).
+[Simulation1_fixed_and_RT_task.m](./Simulation1_fixed_and_RT_task.m): The script shows psychophysical kernels based on drift diffusion model with/without the non-decision time under fixed duration/reaction time tasks (corresponds to Fig. 3 in the paper).
 
-[Simulation2_urgency_and_race_model.m](./Simulation2_urgency_and_race_model.m): The script shows psychophysical kernels for drift diffusion model with urgency and competing accumulator model with input correlation, reflective bound, and leak/mutual inhibition (corresponds to Fig. 6 in the paper).
+[Simulation2_urgency_and_race_model.m](./Simulation2_urgency_and_race_model.m): The script shows psychophysical kernels based on drift diffusion model with urgency and competing accumulator model with input correlation, reflective bound, and leak/mutual inhibition (corresponds to Fig. 6 in the paper).
 
 ## License
 
