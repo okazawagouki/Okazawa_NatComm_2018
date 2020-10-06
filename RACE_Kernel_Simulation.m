@@ -185,7 +185,7 @@ end
 
 %% kernel analysis
     %save the results
-sim.choice = nansum(choice==2)/sum(~isnan(choice));
+sim.choice = nansum(choice==1)/sum(~isnan(choice));
 sim.medianRT = nanmedian(RT);
 sim.sdRT = nanstd(RT);
 

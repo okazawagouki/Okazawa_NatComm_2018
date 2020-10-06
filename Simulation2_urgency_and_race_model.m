@@ -38,7 +38,7 @@ urg_sim = DDM_Kernel_Simulation(p);
 % Race: input correlation
 clear p;
 p.iters = Niters;
-p.t_max = 10000;
+p.t_max = 20000;
 p.B = [-30 30];
 p.rB = [Inf -Inf];
 p.interaction = 0;
